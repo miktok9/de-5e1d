@@ -21,6 +21,11 @@ from upload_tiktok import upload_to_tiktok
 from upload_facebook import upload_to_facebook
 from upload_threads import upload_to_threads
 from upload_twitter import upload_to_twitter
+try:
+    from upload_vk import upload_to_vk
+except ImportError:
+    print("⚠️  VK upload module not found. Install vk_api to enable VK uploads.")
+    upload_to_vk = None
 
 def main():
     """Upload video to all configured platforms."""
@@ -161,6 +166,26 @@ Erforsche die Gesetze, Bräuche, Traditionen und legendären Persönlichkeiten, 
             results['twitter'] = None
     else:
         print("⏭️  Skipping Twitter (credentials not set)")
+    
+    # Upload to VK
+    if upload_to_vk and all([
+        os.getenv('VK_ACCESS_TOKEN'),
+        os.getenv('VK_GROUP_ID')
+    ]):
+        print("\n" + "="*60)
+        print("🔵 Uploading to VK...")
+        print("="*60)
+        try:
+            result = upload_to_vk(video_file, title, description)
+            results['vk'] = result
+            print(f"✅ VK: Uploaded successfully")
+        except Exception as e:
+            print(f"❌ VK failed: {e}")
+            results['vk'] = None
+    elif upload_to_vk:
+        print("⏭️  Skipping VK (credentials not set)")
+    else:
+        print("⏭️  VK upload module not available")
     
     # Summary
     print("\n" + "="*60)

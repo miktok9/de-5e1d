@@ -10,26 +10,40 @@ This script:
 import requests
 from urllib.parse import quote
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 def generate_new_topics(count=100):
-    """Generate new Portuguese topics about ancient women."""
+    """Generate new German topics about ancient women using paid Pollinations API."""
     
-    base_url = "https://text.pollinations.ai/"
+    api_key = os.getenv("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY environment variable is required for paid API")
+    
     system = (
-        "Você é um historiador especializado na história das mulheres nas civilizações antigas. "
-        f"Crie uma lista de {count} tópicos únicos em português. "
-        "Cada tópico deve ser curto (5-10 palavras), interessante e educativo. "
-        "Os tópicos devem cobrir: as leis, os costumes, as mulheres famosas, as profissões, a religião, a cultura, a arte. "
-        "Produza APENAS os tópicos, um por linha, sem números ou marcadores."
+        "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat. "
+        f"Erstelle eine Liste von {count} einzigartigen Themen auf Deutsch. "
+        "Jedes Thema sollte kurz (5-10 Wörter), interessant und lehrreich sein. "
+        "Die Themen sollten folgende Aspekte abdecken: Gesetze, Bräuche, berühmte Frauen, Berufe, Religion, Kultur, Kunst. "
+        "Gib NUR die Themen aus, eines pro Zeile, ohne Nummerierung oder Aufzählungszeichen."
     )
     
-    prompt = f"Crie {count} tópicos únicos sobre mulheres nas civilizações antigas"
+    prompt = f"Erstelle {count} einzigartige Themen über Frauen in antiken Zivilisationen"
     
-    url = base_url + quote(prompt)
-    params = {"model": "openai", "temperature": 0.9, "system": system}
+    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {
+        "model": "nova-fast",
+        "temperature": 0.9,
+        "system": system,
+        "json": False
+    }
     
-    print(f"[topics] Generating {count} new Portuguese topics...")
-    r = requests.get(url, params=params, timeout=120)
+    print(f"[topics] Generating {count} new German topics...")
+    r = requests.get(url, headers=headers, params=params, timeout=120)
     r.raise_for_status()
     
     # Parse topics
