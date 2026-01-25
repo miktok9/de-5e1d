@@ -1,18 +1,21 @@
 """
-Generate 600+ German topics about ancient women's history
+Generate 600+ German topics about ancient women's history using paid Pollinations API
 """
 
-import google.generativeai as genai
+import requests
+from urllib.parse import quote
 import os
+from dotenv import load_dotenv
 
-# Configure Gemini API
-api_key = os.getenv('GEMINI_API_KEY') or 'AIzaSyDSih7wfiLCUo6r7vvHdxQZJnL-vGWlh5s'
-genai.configure(api_key=api_key)
+# Load environment variables from .env file
+load_dotenv()
 
 def generate_german_topics():
-    """Generate 600+ unique German topics about ancient women's history."""
+    """Generate 600+ unique German topics about ancient women's history using paid Pollinations API."""
     
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    api_key = os.getenv("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY environment variable is required for paid API")
     
     prompt = """Generiere 600 einzigartige deutsche Themen über die Geschichte der Frauen in antiken Zivilisationen.
 
@@ -33,15 +36,19 @@ Die Rechte der Frauen im antiken Ägypten
 
 Generiere jetzt 600 einzigartige Themen:"""
 
-    print("[topics] Generating 600 German topics about ancient women's history...")
+    print("[topics] Generating 600 German topics about ancient women's history using paid API...")
     
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
-            temperature=1.0,
-            max_output_tokens=8000,
-        )
-    )
+    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {
+        "model": "nova-fast",
+        "temperature": 1.0,
+        "system": "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat.",
+        "json": False
+    }
+    
+    response = requests.get(url, headers=headers, params=params, timeout=120)
+    response.raise_for_status()
     
     topics_text = response.text.strip()
     topics = [line.strip() for line in topics_text.split('\n') if line.strip() and not line.strip().startswith('#')]
@@ -60,13 +67,20 @@ Generiere jetzt 600 einzigartige Themen:"""
     # If we don't have enough, generate more
     while len(cleaned_topics) < 600:
         print(f"[topics] Need more topics, generating additional batch...")
-        response = model.generate_content(
-            f"Generiere 100 weitere einzigartige deutsche Themen über die Geschichte der Frauen in antiken Zivilisationen. Verwende das Format: 'Die [Thema] in [Zivilisation/Zeitperiode]'. Keine Nummerierung.",
-            generation_config=genai.types.GenerationConfig(
-                temperature=1.2,
-                max_output_tokens=4000,
-            )
-        )
+        
+        additional_prompt = f"Generiere 100 weitere einzigartige deutsche Themen über die Geschichte der Frauen in antiken Zivilisationen. Verwende das Format: 'Die [Thema] in [Zivilisation/Zeitperiode]'. Keine Nummerierung."
+        
+        url = f"https://gen.pollinations.ai/text/{quote(additional_prompt)}"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        params = {
+            "model": "nova-fast",
+            "temperature": 1.2,
+            "system": "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat.",
+            "json": False
+        }
+        
+        response = requests.get(url, headers=headers, params=params, timeout=120)
+        response.raise_for_status()
         
         more_topics = [line.strip() for line in response.text.strip().split('\n') if line.strip()]
         for topic in more_topics:
@@ -82,7 +96,7 @@ Generiere jetzt 600 einzigartige Themen:"""
         for topic in cleaned_topics[:600]:  # Ensure exactly 600
             f.write(topic + '\n')
     
-    print(f"[topics] ✅ Saved {min(len(cleaned_topics), 600)} German topics to topics.txt")
+    print(f"[topics] ✅ Saved {min(len(cleaned_topics), 600)} German topics to topics.txt using paid API")
     return cleaned_topics[:600]
 
 if __name__ == '__main__':

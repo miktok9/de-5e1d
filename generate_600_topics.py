@@ -1,35 +1,47 @@
 """
-Generate 600 Portuguese topics about ancient women's history.
+Generate 600 German topics about ancient women's history using paid Pollinations API.
 """
 
 import requests
 from urllib.parse import quote
 from pathlib import Path
 import time
+import os
+from dotenv import load_dotenv
 
-def generate_french_topics_batch(batch_num, count=100):
-    """Generate a batch of Portuguese topics."""
+# Load environment variables from .env file
+load_dotenv()
+
+def generate_german_topics_batch(batch_num, count=100):
+    """Generate a batch of German topics using paid Pollinations API."""
     
-    base_url = "https://text.pollinations.ai/"
+    api_key = os.getenv("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY environment variable is required for paid API")
     
-    # Simpler system prompt
     system = (
-        "You are a historian specialized in ancient women's history. "
-        f"Create {count} unique topics in Portuguese about women in ancient civilizations. "
-        "Each topic should be 5-10 words, interesting and educational. "
-        "Cover: laws, customs, famous women, professions, religion, culture, art. "
-        "Output ONLY the topics, one per line, no numbers or bullets."
+        "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat. "
+        f"Erstelle {count} einzigartige Themen auf Deutsch über Frauen in antiken Zivilisationen. "
+        "Jedes Thema sollte 5-10 Wörter lang sein, interessant und lehrreich. "
+        "Decke folgende Aspekte ab: Gesetze, Bräuche, berühmte Frauen, Berufe, Religion, Kultur, Kunst. "
+        "Gib NUR die Themen aus, eines pro Zeile, ohne Nummerierung oder Aufzählungszeichen."
     )
     
-    prompt = f"Generate {count} unique Portuguese topics about women in ancient civilizations"
+    prompt = f"Erstelle {count} einzigartige deutsche Themen über Frauen in antiken Zivilisationen"
     
-    url = base_url + quote(prompt)
-    params = {"model": "openai", "temperature": 0.9, "system": system}
+    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {
+        "model": "nova-fast",
+        "temperature": 0.9,
+        "system": system,
+        "json": False
+    }
     
-    print(f"[batch {batch_num}] Generating {count} Portuguese topics...")
+    print(f"[batch {batch_num}] Generating {count} German topics using paid API...")
     
     try:
-        r = requests.get(url, params=params, timeout=120)
+        r = requests.get(url, headers=headers, params=params, timeout=120)
         r.raise_for_status()
         
         # Parse topics
@@ -55,13 +67,13 @@ def generate_french_topics_batch(batch_num, count=100):
         return []
 
 def main():
-    """Generate 600 Portuguese topics in batches."""
+    """Generate 600 German topics in batches using paid Pollinations API."""
     
     all_topics = []
     batches = 6  # 6 batches of 100 = 600 topics
     
     for i in range(batches):
-        topics = generate_french_topics_batch(i+1, 100)
+        topics = generate_german_topics_batch(i+1, 100)
         all_topics.extend(topics)
         
         print(f"[progress] Total topics so far: {len(all_topics)}")
@@ -77,7 +89,7 @@ def main():
         for topic in all_topics:
             f.write(f"{topic}\n")
     
-    print(f"\n[done] Generated {len(all_topics)} Portuguese topics!")
+    print(f"\n[done] Generated {len(all_topics)} German topics using paid API!")
     print(f"[done] Saved to {topics_file}")
 
 if __name__ == '__main__':

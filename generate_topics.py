@@ -89,7 +89,7 @@ def check_and_update_topics():
             for topic in new_topics:
                 f.write(f"{topic}\n")
         
-        print(f"[topics] Added {len(new_topics)} new Portuguese topics!")
+        print(f"[topics] Added {len(new_topics)} new German topics!")
         print(f"[topics] Total topics now: {len(existing_topics) + len(new_topics)}")
     else:
         print(f"[topics] Enough topics available ({len(existing_topics)})")

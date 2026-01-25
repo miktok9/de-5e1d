@@ -1,152 +1,178 @@
 """
-Enhanced Facebook Reels Upload
-
-Facebook Graph API for uploading Reels to Facebook Page with temporary hosting.
+Facebook Reels Upload - Enhanced Version
+Uploads video to tmpfiles.org, then uses URL for Facebook Graph API
 """
 
 import os
 import requests
 import time
 from pathlib import Path
-import tempfile
-import json
-from urllib.parse import urlparse
 
-def upload_to_facebook(video_file, description):
-    """Upload video to Facebook Reels using temporary hosting for better reliability."""
-    
+def upload_to_facebook(video_path, description):
+    """
+    Upload video to Facebook Reels via temporary public URL.
+    """
+
+    print("\n" + "=" * 60)
+    print("📘 FACEBOOK UPLOAD STARTING")
+    print("=" * 60)
+
+    # Get credentials
     access_token = os.getenv('FB_ACCESS_TOKEN')
     page_id = os.getenv('FB_PAGE_ID')
-    
-    if not access_token or not page_id:
-        raise ValueError("Missing FB_ACCESS_TOKEN or FB_PAGE_ID")
-    
-    print(f"[facebook] Uploading: {video_file}")
-    
-    # Step 1: Upload to temporary hosting service
-    print("[facebook] Uploading to temporary hosting...")
-    temp_url = upload_to_temp_hosting(video_file)
-    print(f"[facebook] Temp URL: {temp_url}")
-    
-    # Step 2: Upload video using the temporary URL
-    url = f"https://graph.facebook.com/v18.0/{page_id}/videos"
-    
-    # Retry logic for upload
-    max_retries = 3
-    video_id = None
-    
-    for attempt in range(max_retries):
-        try:
-            data = {
-                'access_token': access_token,
-                'description': description,
-                'title': 'Die Geschichte der Frauen in der Antike',
-                'file_url': temp_url,  # Use temporary URL instead of direct file upload
-                'is_explicit_share': True
-            }
-            
-            response = requests.post(url, data=data, timeout=120)
-            response.raise_for_status()
-            video_id = response.json()['id']
-            print(f"[facebook] ✅ Uploaded! Video ID: {video_id}")
-            break
-        except requests.exceptions.RequestException as e:
-            print(f"[facebook] Upload attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(10 * (attempt + 1))  # Exponential backoff
-            else:
-                # If all retries failed, try direct file upload as fallback
-                print("[facebook] Falling back to direct file upload...")
-                video_id = upload_direct_file(video_file, description, access_token, page_id)
-    
-    # Step 3: Check video processing status
-    print("[facebook] Checking video processing status...")
-    check_processing_status(video_id, access_token)
-    
-    # Step 4: Clean up temporary file
+
+    if not access_token:
+        error_msg = "❌ FB_ACCESS_TOKEN not set"
+        print(f"[facebook] {error_msg}")
+        raise ValueError(error_msg)
+
+    if not page_id:
+        error_msg = "❌ FB_PAGE_ID not set"
+        print(f"[facebook] {error_msg}")
+        raise ValueError(error_msg)
+
+    print(f"[facebook] ✅ Credentials loaded")
+    print(f"[facebook] Page ID: {page_id}")
+    print(f"[facebook] Token length: {len(access_token)} chars")
+
+    # Check video file
+    video_path_obj = Path(video_path)
+    if not video_path_obj.exists():
+        error_msg = f"❌ Video file not found: {video_path}"
+        print(f"[facebook] {error_msg}")
+        raise FileNotFoundError(error_msg)
+
+    file_size_mb = video_path_obj.stat().st_size / (1024 * 1024)
+    print(f"[facebook] ✅ Video file found: {video_path}")
+    print(f"[facebook] Video size: {file_size_mb:.2f} MB")
+
+    # Limit description
+    description_limited = description[:63206] if len(description) > 63206 else description
+    print(f"[facebook] Description length: {len(description_limited)} characters")
+
     try:
-        cleanup_temp_file(temp_url)
-    except Exception as e:
-        print(f"[facebook] Warning: Could not clean up temporary file: {e}")
-    
-    return {'id': video_id, 'temp_url': temp_url}
+        # Step 1: Upload to tmpfiles.org to get public URL
+        print(f"[facebook] 📤 Step 1: Uploading to temporary hosting...")
 
-def upload_direct_file(video_file, description, access_token, page_id):
-    """Fallback method: Direct file upload to Facebook."""
-    url = f"https://graph.facebook.com/v18.0/{page_id}/videos"
-    
-    with open(video_file, 'rb') as f:
-        files = {'file': f}
-        data = {
-            'access_token': access_token,
-            'description': description,
-            'title': 'Die Geschichte der Frauen in der Antike',
-            'is_explicit_share': True
+        with open(video_path_obj, 'rb') as video_file:
+            files = {'file': ('video.mp4', video_file, 'video/mp4')}
+            temp_response = requests.post(
+                'https://tmpfiles.org/api/v1/upload',
+                files=files,
+                timeout=180
+            )
+
+        if temp_response.status_code != 200:
+            error_msg = f"Failed to upload to temporary hosting: {temp_response.status_code}"
+            print(f"[facebook] ❌ {error_msg}")
+            print(f"[facebook] Response: {temp_response.text[:200]}")
+            raise Exception(error_msg)
+
+        temp_data = temp_response.json()
+        if temp_data.get('status') != 'success':
+            error_msg = f"Temporary hosting failed: {temp_data}"
+            print(f"[facebook] ❌ {error_msg}")
+            raise Exception(error_msg)
+
+        # tmpfiles.org returns URL in format: https://tmpfiles.org/12345
+        # We need direct download link: https://tmpfiles.org/dl/12345
+        temp_url = temp_data.get('data', {}).get('url', '')
+
+        # IMPORTANT: Facebook might need HTTPS, not HTTP
+        video_url = temp_url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://')
+
+        print(f"[facebook] ✅ Temporary URL created: {video_url}")
+
+        # Step 2: Create Facebook video post with video URL
+        print(f"[facebook] 📦 Step 2: Creating Facebook video post...")
+
+        # Try different API versions
+        api_versions = ['v18.0', 'v19.0', 'v20.0']
+        video_id = None
+
+        for api_version in api_versions:
+            print(f"[facebook] Trying API version: {api_version}")
+
+            post_url = f"https://graph.facebook.com/{api_version}/{page_id}/videos"
+            post_params = {
+                'access_token': access_token,
+                'description': description_limited,
+                'title': 'Geschichte der antiken Frauen',
+                'file_url': video_url,  # Use file_url instead of uploading file directly
+                'published': True
+            }
+
+            print(f"[facebook] Request URL: {post_url}")
+            print(f"[facebook] Parameters: title='Geschichte der antiken Frauen', file_url={video_url[:50]}..., description length={len(description_limited)}")
+
+            post_response = requests.post(post_url, params=post_params, timeout=60)
+
+            print(f"[facebook] Response status: {post_response.status_code}")
+            print(f"[facebook] Response body: {post_response.text}")
+
+            if post_response.status_code == 200:
+                response_data = post_response.json()
+                video_id = response_data.get('id')
+                if video_id:
+                    print(f"[facebook] ✅ Video posted with API {api_version}: {video_id}")
+                    break
+            else:
+                error_data = post_response.json() if post_response.text else {}
+                error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                error_code = error_data.get('error', {}).get('code', 'N/A')
+                error_type = error_data.get('error', {}).get('type', 'N/A')
+
+                print(f"[facebook] ❌ API {api_version} failed:")
+                print(f"[facebook]    Error type: {error_type}")
+                print(f"[facebook]    Error code: {error_code}")
+                print(f"[facebook]    Error message: {error_msg}")
+
+        if not video_id:
+            error_msg = "Failed to create video post with all API versions"
+            print(f"[facebook] ❌ {error_msg}")
+            raise Exception(error_msg)
+
+        # Step 3: Wait for processing (Facebook usually processes quickly)
+        print(f"[facebook] ⏳ Step 3: Waiting for video processing...")
+        time.sleep(30)  # Give Facebook time to process
+
+        print(f"[facebook] ✅ SUCCESS! Video published to Facebook!")
+        print(f"[facebook] Video ID: {video_id}")
+        print(f"[facebook] Check your Facebook Page to see the post!")
+        print("=" * 60)
+
+        return {
+            'id': video_id,
+            'platform': 'facebook',
+            'status': 'success'
         }
-        
-        response = requests.post(url, files=files, data=data, timeout=120)
-        response.raise_for_status()
-        
-        video_id = response.json()['id']
-        print(f"[facebook] ✅ Direct upload successful! Video ID: {video_id}")
-        return video_id
 
-def check_processing_status(video_id, access_token):
-    """Check Facebook video processing status."""
-    status_url = f"https://graph.facebook.com/v18.0/{video_id}"
-    params = {
-        'access_token': access_token,
-        'fields': 'status'
-    }
-    
-    max_checks = 12  # Check for up to 2 minutes
-    check_interval = 10
-    
-    for i in range(max_checks):
-        try:
-            response = requests.get(status_url, params=params, timeout=30)
-            response.raise_for_status()
-            status_data = response.json()
-            
-            status = status_data.get('status', {}).get('video_status')
-            if status:
-                print(f"[facebook] Processing status: {status} ({(i+1) * check_interval}s)")
-                if status == 'ready':
-                    print("[facebook] ✅ Video processing complete!")
-                    return
-                elif status == 'failed':
-                    print("[facebook] ⚠️  Video processing failed")
-                    return
-            
-            time.sleep(check_interval)
-            
-        except Exception as e:
-            print(f"[facebook] Status check failed: {e}")
-            time.sleep(check_interval)
-    
-    print("[facebook] ⚠️  Video may still be processing. Check Facebook Page for status.")
+    except Exception as e:
+        print(f"[facebook] ❌ ERROR!")
+        print(f"[facebook] {str(e)}")
+        print("=" * 60)
+        raise
 
-def upload_to_temp_hosting(video_file):
-    """Upload video to temporary hosting service (tmpfiles.org)."""
-    url = "https://tmpfiles.org/api/v1/upload"
-    
-    with open(video_file, 'rb') as f:
-        files = {'file': f}
-        response = requests.post(url, files=files, timeout=120)
-        response.raise_for_status()
-        
-        data = response.json()
-        temp_url = data['data']['url']
-        
-        # Convert to direct download URL
-        parsed = urlparse(temp_url)
-        direct_url = f"{parsed.scheme}://{parsed.netloc}/dl{parsed.path}"
-        
-        return direct_url
+def main():
+    """Test upload to Facebook."""
+    video_file = Path('output/final_video.mp4')
 
-def cleanup_temp_file(temp_url):
-    """Attempt to clean up temporary file (best effort)."""
-    # tmpfiles.org automatically deletes files after 14 days
-    # This is just a placeholder - actual cleanup would require
-    # storing the deletion token from the initial upload response
-    pass
+    if not video_file.exists():
+        print(f"[facebook] ❌ Video not found: {video_file}")
+        return
+
+    # Read story for description
+    story_file = Path('output/story.txt')
+    if story_file.exists():
+        description = story_file.read_text(encoding='utf-8')[:63206]  # Facebook description limit
+    else:
+        description = "Geschichte der antiken Frauen 🏛️ #Geschichte #Frauen #Bildung"
+
+    try:
+        result = upload_to_facebook(str(video_file), description)
+        print(f"\n✅ Success! Result: {result}")
+    except Exception as e:
+        print(f"\n❌ Failed: {e}")
+
+if __name__ == '__main__':
+    main()

@@ -1,204 +1,228 @@
 """
-Enhanced Threads Upload Script
-
-Uploads videos to Threads using Instagram Graph API with temporary hosting.
-Threads uses the same API as Instagram.
-
-Requirements:
-- Instagram Business or Creator account
-- Facebook App with Instagram Graph API access
-- THREADS_ACCESS_TOKEN and THREADS_USER_ID in environment
+Threads Upload - Enhanced Debugging Version
+Uploads video to tmpfiles.org, then uses URL for Threads API
 """
 
 import os
 import requests
-from pathlib import Path
 import time
-import tempfile
-import json
-from urllib.parse import urlparse
+from pathlib import Path
 
-def upload_to_threads(video_file, caption):
-    """Upload video to Threads using Instagram Graph API with temporary hosting for better reliability."""
-    
+def upload_to_threads(video_path, text):
+    """
+    Upload video to Threads via temporary public URL.
+    """
+
+    print("\n" + "=" * 60)
+    print("🧵 THREADS UPLOAD STARTING")
+    print("=" * 60)
+
+    # Get credentials
     access_token = os.getenv('THREADS_ACCESS_TOKEN')
     user_id = os.getenv('THREADS_USER_ID')
-    
-    if not access_token or not user_id:
-        raise ValueError(
-            "Missing Threads credentials! Set these environment variables:\n"
-            "  - THREADS_ACCESS_TOKEN\n"
-            "  - THREADS_USER_ID"
-        )
-    
-    print("[threads] Uploading to Threads...")
-    
-    # Step 1: Upload to temporary hosting service
-    print("[threads] Uploading to temporary hosting...")
-    temp_url = upload_to_temp_hosting(video_file)
-    print(f"[threads] Temp URL: {temp_url}")
-    
-    # Step 2: Create media container with retry logic
-    print("[threads] Creating media container...")
-    
-    container_url = f"https://graph.threads.net/v1.0/{user_id}/threads"
-    
-    params = {
-        'media_type': 'VIDEO',
-        'video_url': temp_url,  # Use temporary URL
-        'text': caption,
-        'access_token': access_token
-    }
-    
-    # Retry logic for container creation
-    max_retries = 3
-    container_id = None
-    
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(container_url, params=params, timeout=60)
-            if response.status_code != 200:
-                raise Exception(f"Failed to create container: {response.text}")
-            
-            container_id = response.json().get('id')
-            print(f"[threads] Container created: {container_id}")
-            break
-        except Exception as e:
-            print(f"[threads] Container creation attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(5 * (attempt + 1))
+
+    if not access_token:
+        error_msg = "❌ THREADS_ACCESS_TOKEN not set"
+        print(f"[threads] {error_msg}")
+        raise ValueError(error_msg)
+
+    if not user_id:
+        error_msg = "❌ THREADS_USER_ID not set"
+        print(f"[threads] {error_msg}")
+        raise ValueError(error_msg)
+
+    print(f"[threads] ✅ Credentials loaded")
+    print(f"[threads] User ID: {user_id}")
+    print(f"[threads] Token length: {len(access_token)} chars")
+
+    # Check video file
+    video_path_obj = Path(video_path)
+    if not video_path_obj.exists():
+        error_msg = f"❌ Video file not found: {video_path}"
+        print(f"[threads] {error_msg}")
+        raise FileNotFoundError(error_msg)
+
+    file_size_mb = video_path_obj.stat().st_size / (1024 * 1024)
+    print(f"[threads] ✅ Video file found: {video_path}")
+    print(f"[threads] Video size: {file_size_mb:.2f} MB")
+
+    # Limit text
+    text_limited = text[:500] if len(text) > 500 else text
+    print(f"[threads] Text length: {len(text_limited)} characters")
+
+    try:
+        # Step 1: Upload to tmpfiles.org to get public URL
+        print(f"[threads] 📤 Step 1: Uploading to temporary hosting...")
+
+        with open(video_path_obj, 'rb') as video_file:
+            files = {'file': ('video.mp4', video_file, 'video/mp4')}
+            temp_response = requests.post(
+                'https://tmpfiles.org/api/v1/upload',
+                files=files,
+                timeout=180
+            )
+
+        if temp_response.status_code != 200:
+            error_msg = f"Failed to upload to temporary hosting: {temp_response.status_code}"
+            print(f"[threads] ❌ {error_msg}")
+            print(f"[threads] Response: {temp_response.text[:200]}")
+            raise Exception(error_msg)
+
+        temp_data = temp_response.json()
+        if temp_data.get('status') != 'success':
+            error_msg = f"Temporary hosting failed: {temp_data}"
+            print(f"[threads] ❌ {error_msg}")
+            raise Exception(error_msg)
+
+        # tmpfiles.org returns URL in format: https://tmpfiles.org/12345
+        # We need direct download link: https://tmpfiles.org/dl/12345
+        temp_url = temp_data.get('data', {}).get('url', '')
+
+        # IMPORTANT: Threads might need HTTPS, not HTTP
+        video_url = temp_url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://')
+
+        print(f"[threads] ✅ Temporary URL created: {video_url}")
+
+        # Step 2: Create Threads container with video URL
+        print(f"[threads] 📦 Step 2: Creating Threads container...")
+
+        # Try different API versions
+        api_versions = ['v1.0', 'v18.0']
+        container_id = None
+
+        for api_version in api_versions:
+            print(f"[threads] Trying API version: {api_version}")
+
+            container_url = f"https://graph.threads.net/{api_version}/{user_id}/threads"
+            container_params = {
+                'media_type': 'VIDEO',
+                'video_url': video_url,
+                'text': text_limited,
+                'access_token': access_token
+            }
+
+            print(f"[threads] Request URL: {container_url}")
+            print(f"[threads] Parameters: media_type=VIDEO, video_url={video_url[:50]}..., text length={len(text_limited)}")
+
+            container_response = requests.post(container_url, params=container_params, timeout=60)
+
+            print(f"[threads] Response status: {container_response.status_code}")
+            print(f"[threads] Response headers: {dict(container_response.headers)}")
+            print(f"[threads] Response body: {container_response.text}")
+
+            if container_response.status_code == 200:
+                response_data = container_response.json()
+                container_id = response_data.get('id')
+                if container_id:
+                    print(f"[threads] ✅ Container created with API {api_version}: {container_id}")
+                    break
             else:
-                raise Exception(f"Failed to create container after {max_retries} attempts")
-    
-    # Step 3: Wait for processing with enhanced status checking
-    print("[threads] Waiting for video processing...")
-    max_wait = 300  # Increased to 5 minutes
-    waited = 0
-    wait_interval = 10
-    
-    processing_complete = False
-    
-    while waited < max_wait and not processing_complete:
-        try:
+                error_data = container_response.json() if container_response.text else {}
+                error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                error_code = error_data.get('error', {}).get('code', 'N/A')
+                error_type = error_data.get('error', {}).get('type', 'N/A')
+                error_subcode = error_data.get('error', {}).get('error_subcode', 'N/A')
+
+                print(f"[threads] ❌ API {api_version} failed:")
+                print(f"[threads]    Error type: {error_type}")
+                print(f"[threads]    Error code: {error_code}")
+                print(f"[threads]    Error subcode: {error_subcode}")
+                print(f"[threads]    Error message: {error_msg}")
+
+        if not container_id:
+            error_msg = "Failed to create container with all API versions"
+            print(f"[threads] ❌ {error_msg}")
+            raise Exception(error_msg)
+
+        # Step 3: Wait for processing
+        print(f"[threads] ⏳ Step 3: Waiting for video processing...")
+        max_wait = 120
+        waited = 0
+
+        while waited < max_wait:
             status_url = f"https://graph.threads.net/v1.0/{container_id}"
-            status_params = {'fields': 'status_code,status', 'access_token': access_token}
-            
+            status_params = {
+                'fields': 'status',
+                'access_token': access_token
+            }
+
             status_response = requests.get(status_url, params=status_params, timeout=30)
             status_data = status_response.json()
-            
-            status_code = status_data.get('status_code')
-            detailed_status = status_data.get('status', 'unknown')
-            
-            print(f"[threads] Processing status: {status_code} ({detailed_status}) - {waited}s elapsed")
-            
-            if status_code == 'FINISHED':
-                processing_complete = True
-                print("[threads] ✅ Video processing complete!")
-            elif status_code == 'ERROR':
-                error_details = status_data.get('error', {})
-                raise Exception(f"Video processing failed: {error_details}")
-            
-        except Exception as e:
-            print(f"[threads] Status check failed: {e}")
-            # Continue waiting even if status check fails
-        
-        if not processing_complete:
-            time.sleep(wait_interval)
-            waited += wait_interval
-    
-    if not processing_complete:
-        print("[threads] ⚠️  Video may still be processing. Proceeding with publication.")
-    
-    # Step 4: Publish the post with retry logic
-    print("[threads] Publishing post...")
-    
-    publish_url = f"https://graph.threads.net/v1.0/{user_id}/threads_publish"
-    publish_params = {
-        'creation_id': container_id,
-        'access_token': access_token
-    }
-    
-    # Retry logic for publishing
-    publish_success = False
-    for attempt in range(max_retries):
-        try:
-            publish_response = requests.post(publish_url, params=publish_params, timeout=60)
-            if publish_response.status_code != 200:
-                raise Exception(f"Failed to publish: {publish_response.text}")
-            
-            thread_id = publish_response.json().get('id')
-            publish_success = True
-            break
-        except Exception as e:
-            print(f"[threads] Publish attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(10 * (attempt + 1))
-            else:
-                raise Exception(f"Failed to publish after {max_retries} attempts")
-    
-    if not publish_success:
-        raise Exception("Failed to publish to Threads")
-    
-    print(f"[threads] ✅ Published to Threads! ID: {thread_id}")
-    
-    # Step 5: Clean up temporary file
-    try:
-        cleanup_temp_file(temp_url)
+            status = status_data.get('status', 'UNKNOWN')
+
+            print(f"[threads] Status: {status} (waited {waited}s)")
+
+            if status == 'FINISHED':
+                print(f"[threads] ✅ Video processing complete!")
+                break
+            elif status == 'ERROR':
+                error_msg = status_data.get('error_message', 'Video processing failed')
+                print(f"[threads] ❌ {error_msg}")
+                raise Exception(error_msg)
+
+            time.sleep(10)
+            waited += 10
+
+        if waited >= max_wait:
+            error_msg = "Video processing timed out"
+            print(f"[threads] ❌ {error_msg}")
+            raise Exception(error_msg)
+
+        # Step 4: Publish
+        print(f"[threads] 📤 Step 4: Publishing to Threads...")
+        publish_url = f"https://graph.threads.net/v1.0/{user_id}/threads_publish"
+        publish_params = {
+            'creation_id': container_id,
+            'access_token': access_token
+        }
+
+        publish_response = requests.post(publish_url, params=publish_params, timeout=60)
+
+        if publish_response.status_code != 200:
+            error_data = publish_response.json() if publish_response.text else {}
+            error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+            print(f"[threads] ❌ Publish failed: {error_msg}")
+            raise Exception(f"Threads Publish Error: {error_msg}")
+
+        thread_id = publish_response.json().get('id')
+
+        print(f"[threads] ✅ SUCCESS! Video published to Threads!")
+        print(f"[threads] Thread ID: {thread_id}")
+        print(f"[threads] Check your Threads profile to see the post!")
+        print("=" * 60)
+
+        return {
+            'id': thread_id,
+            'platform': 'threads',
+            'status': 'success'
+        }
+
     except Exception as e:
-        print(f"[threads] Warning: Could not clean up temporary file: {e}")
-    
-    return {
-        'id': thread_id,
-        'container_id': container_id,
-        'temp_url': temp_url,
-        'platform': 'threads'
-    }
+        print(f"[threads] ❌ ERROR!")
+        print(f"[threads] {str(e)}")
+        print("=" * 60)
+        raise
 
 def main():
     """Test upload to Threads."""
     video_file = Path('output/final_video.mp4')
-    
+
     if not video_file.exists():
-        print("[threads] ❌ No video found at output/final_video.mp4")
+        print(f"[threads] ❌ Video not found: {video_file}")
         return
-    
+
     # Read story for caption
     story_file = Path('output/story.txt')
     if story_file.exists():
         caption = story_file.read_text(encoding='utf-8')[:500]  # Threads has character limit
     else:
-        caption = "Die Geschichte der Frauen in der Antike 🏛️"
-    
+        caption = "Geschichte der antiken Frauen 🏛️"
+
     try:
-        upload_to_threads(video_file, caption)
+        result = upload_to_threads(str(video_file), caption)
+        print(f"\n✅ Success! Result: {result}")
     except Exception as e:
-        print(f"[threads] ❌ Upload failed: {e}")
-        raise
-
-def upload_to_temp_hosting(video_file):
-    """Upload video to temporary hosting service (tmpfiles.org)."""
-    url = "https://tmpfiles.org/api/v1/upload"
-    
-    with open(video_file, 'rb') as f:
-        files = {'file': f}
-        response = requests.post(url, files=files, timeout=120)
-        response.raise_for_status()
-        
-        data = response.json()
-        temp_url = data['data']['url']
-        
-        # Convert to direct download URL
-        parsed = urlparse(temp_url)
-        direct_url = f"{parsed.scheme}://{parsed.netloc}/dl{parsed.path}"
-        
-        return direct_url
-
-def cleanup_temp_file(temp_url):
-    """Attempt to clean up temporary file (best effort)."""
-    # tmpfiles.org automatically deletes files after 14 days
-    # This is just a placeholder - actual cleanup would require
-    # storing the deletion token from the initial upload response
-    pass
+        print(f"\n❌ Failed: {e}")
 
 if __name__ == '__main__':
     main()

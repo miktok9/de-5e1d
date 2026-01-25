@@ -136,22 +136,15 @@ def generate_image(scene: str, idx: int) -> Path:
     # Create unique seed for each image based on scene content + index
     seed = hash(scene + str(idx)) % 1000000
     
-    # Build high-quality photorealistic prompt focusing on beautiful ancient women
+    # Optimized prompt for flux model with simplified negative prompt
     prompt = (
-        f"stunning beautifully dressed woman from ancient civilization, {scene}, "
-        f"hyper-realistic portrait, extremely detailed facial features, "
-        f"intricate traditional ancient clothing with rich textures, "
-        f"professional studio lighting, dramatic shadows and highlights, "
-        f"RAW photography, photorealistic, 8K resolution, ultra-high detail, "
-        f"sharp focus, depth of field, bokeh, cinematic composition, "
-        f"masterpiece, award-winning photography, volumetric lighting, "
-        f"hyper-detailed skin texture, realistic eyes with catchlights, "
-        f"museum quality art, historical accuracy, elegant and graceful pose, "
-        f"appropriate for all audiences, clean and tasteful"
+        f"beautiful historically accurate woman from ancient civilization, {scene}, "
+        f"highly detailed portrait, traditional ancient clothing, "
+        f"professional photography, sharp focus, masterpiece, trending on artstation"
     )
     safe_prompt = quote(prompt)
     
-    # Build URL with enhanced parameters for photorealism and safety
+    # Build URL with optimized parameters for flux model
     url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
     headers = {"Authorization": f"Bearer {os.getenv('POLLINATIONS_API_KEY')}"}
     params = {
@@ -159,9 +152,9 @@ def generate_image(scene: str, idx: int) -> Path:
         "height": IMAGE_HEIGHT,
         "model": "flux",  # Use flux model
         "seed": seed,
-        "safe": True,  # Enable strict content filtering to prevent NSFW (boolean)
-        "nologo": True,  # Explicitly request no watermarks
-        "negative_prompt": "worst quality, blurry, watermark, logo, text, signature, branded content, inappropriate, revealing, suggestive, nude, sexual, violence, blood, gore"
+        "safe": True,  # Enable content filtering
+        "nologo": True,  # No watermarks
+        "negative_prompt": "blurry, bad quality"  # Simplified negative prompt for better API performance
     }
 
     out = IMAGES_DIR / f"scene_{idx:02d}.jpg"

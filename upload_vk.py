@@ -37,7 +37,7 @@ def upload_to_vk(video_path, description="", title=""):
     group_id_clean = str(group_id).lstrip('-')
     group_id_int = int(group_id_clean)
     
-    print(f"🇩🇪 Starting VK upload using vk_api...")
+    print(f"🇷🇺 Starting VK upload using vk_api...")
     print(f"📁 Video: {video_path}")
     print(f"👥 Group ID: {group_id}")
     
