@@ -50,10 +50,35 @@ def ensure_dirs():
         f.unlink()
 
 def choose_topic_for_today():
-    with open(TOPICS_FILE, "r", encoding="utf-8") as f:
+    """Choose today's topic and mark it as used."""
+    topics_file = Path(TOPICS_FILE)
+    used_topics_file = Path("used_topics.txt")
+    
+    # Read available topics
+    with open(topics_file, "r", encoding="utf-8") as f:
         topics = [line.strip() for line in f if line.strip()]
+    
+    if not topics:
+        raise Exception("No topics available! Run generate_topics.py first.")
+    
+    # Choose topic based on date (deterministic)
     today = datetime.date.today()
-    return topics[today.toordinal() % len(topics)]
+    selected_topic = topics[today.toordinal() % len(topics)]
+    
+    # Mark topic as used
+    with open(used_topics_file, "a", encoding="utf-8") as f:
+        f.write(f"{selected_topic}\n")
+    
+    # Remove used topic from topics.txt
+    remaining_topics = [t for t in topics if t != selected_topic]
+    with open(topics_file, "w", encoding="utf-8") as f:
+        for topic in remaining_topics:
+            f.write(f"{topic}\n")
+    
+    print(f"[topics] Selected: {selected_topic}")
+    print(f"[topics] Remaining topics: {len(remaining_topics)}")
+    
+    return selected_topic
 
 def generate_story_with_pollinations(topic: str) -> str:
     """Generate a short German story about ancient women's history using paid Pollinations API."""
