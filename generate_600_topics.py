@@ -29,24 +29,31 @@ def generate_german_topics_batch(batch_num, count=100):
     
     prompt = f"Erstelle {count} einzigartige deutsche Themen über Frauen in antiken Zivilisationen"
     
-    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
+    url = "https://gen.pollinations.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
         "model": "nova-fast",
-        "temperature": 0.9,
-        "system": system,
-        "json": False
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.9
     }
     
     print(f"[batch {batch_num}] Generating {count} German topics using paid API...")
     
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=120)
+        r = requests.post(url, headers=headers, json=payload, timeout=120)
         r.raise_for_status()
+        
+        response_text = r.json()['choices'][0]['message']['content'].strip()
         
         # Parse topics
         topics = []
-        for line in r.text.strip().split('\n'):
+        for line in response_text.split('\n'):
             cleaned = line.strip()
             # Remove common prefixes
             for prefix in ['- ', '* ', '• ', '→ ', '> ']:

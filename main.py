@@ -94,19 +94,24 @@ def generate_story_with_pollinations(topic: str) -> str:
     )
     prompt = f"Thema: {topic}. Erzähle eine interessante historische Tatsache."
 
-    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
+    url = "https://gen.pollinations.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
         "model": "nova-fast",
-        "temperature": 1.0,
-        "system": system,
-        "json": False
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 1.0
     }
 
     print(f"[story] Generating German story for topic: {topic}")
-    r = requests.get(url, headers=headers, params=params, timeout=60)
+    r = requests.post(url, headers=headers, json=payload, timeout=60)
     r.raise_for_status()
-    text = r.text.strip()
+    text = r.json()['choices'][0]['message']['content'].strip()
 
     words = text.split()
     if len(words) > STORY_MAX_WORDS:
@@ -170,7 +175,7 @@ def generate_image(scene: str, idx: int) -> Path:
     safe_prompt = quote(prompt)
     
     # Build URL with optimized parameters for flux model
-    url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
+    url = f"https://gen.pollinations.ai/image/{safe_prompt}"
     headers = {"Authorization": f"Bearer {os.getenv('POLLINATIONS_API_KEY')}"}
     params = {
         "width": IMAGE_WIDTH,

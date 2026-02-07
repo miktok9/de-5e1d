@@ -38,19 +38,24 @@ Generiere jetzt 600 einzigartige Themen:"""
 
     print("[topics] Generating 600 German topics about ancient women's history using paid API...")
     
-    url = f"https://gen.pollinations.ai/text/{quote(prompt)}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
+    url = "https://gen.pollinations.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
         "model": "nova-fast",
-        "temperature": 1.0,
-        "system": "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat.",
-        "json": False
+        "messages": [
+            {"role": "system", "content": "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 1.0
     }
     
-    response = requests.get(url, headers=headers, params=params, timeout=120)
+    response = requests.post(url, headers=headers, json=payload, timeout=120)
     response.raise_for_status()
     
-    topics_text = response.text.strip()
+    topics_text = response.json()['choices'][0]['message']['content'].strip()
     topics = [line.strip() for line in topics_text.split('\n') if line.strip() and not line.strip().startswith('#')]
     
     # Remove any numbering that might have been added
@@ -70,19 +75,24 @@ Generiere jetzt 600 einzigartige Themen:"""
         
         additional_prompt = f"Generiere 100 weitere einzigartige deutsche Themen über die Geschichte der Frauen in antiken Zivilisationen. Verwende das Format: 'Die [Thema] in [Zivilisation/Zeitperiode]'. Keine Nummerierung."
         
-        url = f"https://gen.pollinations.ai/text/{quote(additional_prompt)}"
-        headers = {"Authorization": f"Bearer {api_key}"}
-        params = {
+        url = "https://gen.pollinations.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
             "model": "nova-fast",
-            "temperature": 1.2,
-            "system": "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat.",
-            "json": False
+            "messages": [
+                {"role": "system", "content": "Du bist ein Historiker, der sich auf die Geschichte der Frauen in antiken Zivilisationen spezialisiert hat."},
+                {"role": "user", "content": additional_prompt}
+            ],
+            "temperature": 1.2
         }
         
-        response = requests.get(url, headers=headers, params=params, timeout=120)
+        response = requests.post(url, headers=headers, json=payload, timeout=120)
         response.raise_for_status()
         
-        more_topics = [line.strip() for line in response.text.strip().split('\n') if line.strip()]
+        more_topics = [line.strip() for line in response.json()['choices'][0]['message']['content'].strip().split('\n') if line.strip()]
         for topic in more_topics:
             import re
             cleaned = re.sub(r'^\d+[\.\)]\s*', '', topic)
