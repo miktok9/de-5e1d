@@ -4,7 +4,10 @@ on:
   schedule:
     - cron: "30 15 * * *"     # 9:00 PM India time (3:30 PM UTC)
   workflow_dispatch:
-
+ 
+permissions:
+  contents: write
+ 
 jobs:
   generate-and-upload:
     runs-on: ubuntu-latest
@@ -92,6 +95,16 @@ jobs:
         VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
       run: |
         python upload_all_platforms.py
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add topics.txt used_topics.txt
+        git commit -m "Update topics: remove used topic [skip ci]" || echo "No changes to commit"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload video artifact (backup)
       uses: actions/upload-artifact@v4
