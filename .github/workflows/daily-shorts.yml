@@ -1,8 +1,6 @@
 name: Daily Auto Shorts with Multi-Platform Upload
 
 on:
-  schedule:
-    - cron: "30 15 * * *"     # 9:00 PM India time (3:30 PM UTC)
   workflow_dispatch:
  
 permissions:
@@ -66,7 +64,7 @@ jobs:
 
     - name: Generate daily short video
       run: |
-        python main.py
+        $env:GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}\n        GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}\n      run: |\n        python main.py
 
     - name: Upload to all platforms (YouTube, Instagram, TikTok, Facebook, Threads, Twitter, VK)
       env:
@@ -100,8 +98,9 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add topics.txt used_topics.txt
+        git add topics.txt used_images.json 2>/dev/null || true used_topics.txt
         git commit -m "Update topics: remove used topic [skip ci]" || echo "No changes to commit"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
