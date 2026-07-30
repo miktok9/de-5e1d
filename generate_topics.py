@@ -48,7 +48,16 @@ def generate_new_topics(count=100):
     }
     
     print(f"[topics] Generating {count} new German topics...")
-    r = requests.post(url, headers=headers, json=payload, timeout=120)
+    for _attempt in range(3):
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=180)
+            break
+        except Exception as e:
+            print(f"[topics] Attempt failed: {e}")
+            if _attempt < 2:
+                import time; time.sleep((_attempt+1)*10)
+            else:
+                raise
     r.raise_for_status()
     
     response_text = r.json()['choices'][0]['message']['content'].strip()
