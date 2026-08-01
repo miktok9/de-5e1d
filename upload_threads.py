@@ -191,11 +191,7 @@ def upload_to_threads(video_path, text):
         print(f"[threads] Check your Threads profile to see the post!")
         print("=" * 60)
 
-        return {
-            'id': thread_id,
-            'platform': 'threads',
-            'status': 'success'
-        }
+        {'id': thread_id, 'platform': 'threads', 'status': 'success', 'link': f"https://www.threads.net/@t/{thread_id}"}
 
     except Exception as e:
         print(f"[threads] ❌ ERROR!")

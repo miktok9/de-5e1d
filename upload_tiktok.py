@@ -179,11 +179,7 @@ def upload_to_tiktok(video_path, title, description):
                 print(f"[tiktok] Check your TikTok profile to see the video!")
                 print("=" * 60)
 
-                return {
-                    'id': publish_id,
-                    'platform': 'tiktok',
-                    'status': 'success'
-                }
+                {'id': publish_id, 'platform': 'tiktok', 'status': 'success', 'link': f"https://www.tiktok.com/@{os.getenv('TIKTOK_USERNAME', '')}/video/{publish_id}"}
             elif status in ['FAILED', 'ERROR']:
                 error_msg = status_result.get('data', {}).get('error_message', 'Upload failed')
                 print(f"[tiktok] ❌ Upload failed: {error_msg}")
