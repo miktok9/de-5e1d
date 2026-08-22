@@ -63,23 +63,40 @@ def choose_topic_for_today():
         raise Exception("No topics available! Run generate_topics.py first.")
     
     # Choose topic based on date (deterministic)
+    # Pick a topic that has NOT been used yet (history persisted via git commit)
     today = datetime.date.today()
-    selected_topic = topics[today.toordinal() % len(topics)]
-    
-    # Mark topic as used
-    with open(used_topics_file, "a", encoding="utf-8") as f:
-        f.write(f"{selected_topic}\n")
-    
-    # Remove used topic from topics.txt
-    remaining_topics = [t for t in topics if t != selected_topic]
-    with open(topics_file, "w", encoding="utf-8") as f:
-        for topic in remaining_topics:
-            f.write(f"{topic}\n")
-    
-    print(f"[topics] Selected: {selected_topic}")
-    print(f"[topics] Remaining topics: {len(remaining_topics)}")
-    
+    used_file = "used_topics.txt"
+    used = set()
+    if os.path.exists(used_file):
+        with open(used_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                if ":" in line:
+                    topic = line.split(":", 1)[1].strip()
+                else:
+                    topic = line
+                if topic:
+                    used.add(topic)
+
+    remaining = [t for t in all_topics if t not in used]
+
+    if not remaining:
+        # All topics exhausted -> reset history and recycle
+        print(f"[topics] All {len(all_topics)} topics used. Resetting history.")
+        remaining = list(all_topics)
+        used = set()
+        open(used_file, "w", encoding="utf-8").close()
+
+    selected_topic = random.choice(remaining)
+    print(f"[topics] Date: {today}, Pool: {len(all_topics)}, Used: {len(used)}, Selected: {selected_topic}")
+
+    with open(used_file, "a", encoding="utf-8") as f:
+        f.write(f"{today}: {selected_topic}\n")
+
     return selected_topic
+
 
 def generate_story_with_pollinations(topic: str) -> str:
     """Generate story using Pollinations AI."""
