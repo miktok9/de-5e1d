@@ -2,10 +2,7 @@ name: Daily Auto Shorts with Multi-Platform Upload
 
 on:
   schedule:
-    - cron: "2 5 * * *"
-    - cron: "28 10 * * *"
-    - cron: "51 14 * * *"
-    - cron: "19 19 * * *"
+    - cron: "55 6 * * *"      # Once daily
   workflow_dispatch:
 
 permissions:
@@ -43,37 +40,24 @@ jobs:
 
     - name: Check and generate topics if needed
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
       run: |
         python generate_topics.py
 
     - name: Generate daily short video
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
         GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
         GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
       run: |
         python main.py
 
-    - name: Upload to all platforms
+    - name: Upload to YouTube Shorts
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
         YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
         YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
         YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-        IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-        IG_USER_ID: ${{ secrets.IG_USER_ID }}
-        TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
-        FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
-        FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
-        THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-        THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-        TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-        TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-        TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-        TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-        VK_ACCESS_TOKEN: ${{ secrets.VK_ACCESS_TOKEN }}
-        VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
       run: |
         python upload_all_platforms.py
 
@@ -88,7 +72,7 @@ jobs:
           exit 1
         fi
         python -c "import json,os; f='used_images.json'; json.load(open(f,encoding='utf-8')) if os.path.exists(f) else None" 2>/dev/null || rm -f used_images.json
-        git add topics.txt used_topics.txt used_images.json output/story_en.txt 2>/dev/null
+        git add topics.txt used_topics.txt used_images.json output/story_en.txt output/topic.txt output/story.txt 2>/dev/null
         git pull --rebase --autostash origin main || { git rebase --abort 2>/dev/null; echo "WARNING: rebase failed"; }
         git diff --cached --name-only | while read -r f; do
           if [ -f "$f" ] && grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$f" 2>/dev/null; then
@@ -103,4 +87,3 @@ jobs:
         fi
         git push || { sleep 5; git push; }
         exit 0
-
