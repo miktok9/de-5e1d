@@ -107,7 +107,7 @@ def generate_story_with_pollinations(topic: str) -> str:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     system = "You are a classical historian specializing in ancient history. Write an engaging, captivating 30-second narration (80-120 words) in German about the requested topic from ancient history. Focus on intriguing historical facts, customs, courage, or traditions. Do NOT include any titles, markdown formatting, symbols, or meta commentary. Write pure narrative text only."
     prompt = f"Thema: {topic}. Erzähle eine faszinierende historische Tatsache auf Deutsch."
-    payload = {"model": "openai", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": 0.8}
+    payload = {"model": "openai/gpt-5.4-nano", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": 0.8}
     print(f"[story] Generating German story for topic: {topic}")
     
     text = None
@@ -150,7 +150,7 @@ def generate_english_story(topic: str) -> str:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     system = "You are a classical historian specializing in ancient history. Write an engaging, captivating 30-second narration (80-120 words) in English about the requested topic from ancient history. Focus on intriguing historical facts, customs, courage, or traditions. Do NOT include any titles, markdown formatting, symbols, or meta commentary. Write pure narrative text only."
     prompt = f"Topic: {topic}. Write an interesting historical narrative in English."
-    payload = {"model": "openai", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": 0.8}
+    payload = {"model": "openai/gpt-5.4-nano", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": 0.8}
     print(f"[story] Generating English story for topic: {topic}")
     
     text = None
