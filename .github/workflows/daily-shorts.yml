@@ -40,13 +40,13 @@ jobs:
 
     - name: Check and generate topics if needed
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
       run: |
         python generate_topics.py
 
     - name: Generate daily short video
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
         GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
         GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
       run: |
@@ -54,7 +54,7 @@ jobs:
 
     - name: Upload to YouTube Shorts
       env:
-        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY || 'sk_B0I1QMA8hWP14sICrnx1S1pt8riQdpLZ' }}
+        POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
         YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
         YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
         YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
